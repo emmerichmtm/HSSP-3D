@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "3-D hypervolume subset selection: the n^O(sqrt k) separator dynamic programme and the EPTAS of Bringmann, Cabello and Emmerich (Python + Numba)"
 readme = "README.md"
 authors = [{ name = "Michael Emmerich" }]
-license = { text = "MIT" }
+license = { text = "MIT (source code); CC-BY-4.0 (report, documentation, data)" }
 requires-python = ">=3.9"
 dependencies = ["numpy", "numba>=0.57"]
 

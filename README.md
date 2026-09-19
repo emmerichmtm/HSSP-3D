@@ -140,4 +140,13 @@ Results (JSON) are written to `experiments/`; `python experiments/make_tables.py
 
 ## License
 
-MIT
+© 2026 Michael Emmerich.
+
+* **Report, documentation, figures, tables and result data** (`report/`, `README.md`,
+  `experiments/*.json`) are licensed under
+  [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
+  — see [`LICENSE-CC-BY-4.0`](LICENSE-CC-BY-4.0). Please attribute as: Michael Emmerich,
+  *An Implementation of the n^O(√k) Algorithm and of the EPTAS for 3-D Hypervolume Subset
+  Selection*, University of Jyväskylä, 2026, https://github.com/emmerichmtm/HSSP-3D.
+* **Source code** (`src/`, `tests/`, `experiments/*.py`) is licensed under the
+  [MIT License](LICENSE); Creative Commons licences are not intended for software.
