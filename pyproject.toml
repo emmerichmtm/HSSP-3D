@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hssp3d"
-version = "0.1.0"
-description = "3-D hypervolume subset selection in n^O(sqrt k) time (planar-separator dynamic programme), Python + Numba"
+version = "0.2.0"
+description = "3-D hypervolume subset selection: the n^O(sqrt k) separator dynamic programme and the EPTAS of Bringmann, Cabello and Emmerich (Python + Numba)"
 readme = "README.md"
 authors = [{ name = "Michael Emmerich" }]
 license = { text = "MIT" }

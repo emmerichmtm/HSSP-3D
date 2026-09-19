@@ -25,3 +25,20 @@ FRONTS = {
     "DTLZ2": (dtlz2_front, np.array([1.1, 1.1, 1.1])),
     "cDTLZ2": (convex_dtlz2_front, np.array([1.1, 1.1, 1.1])),
 }
+
+
+def log_simplex_points(n, decades=40.0, seed=0, spread=1.0):
+    """Anchored-box points (maximisation) 10^u with u uniform on the part of the plane
+    u1 + u2 + u3 = c inside [-decades, decades]^3, with c uniform in [-spread, spread].
+
+    The box volumes 10^c differ by up to 2*spread orders of magnitude, and the coordinates
+    span many orders of magnitude - the regime in which the exponential grid of the EPTAS
+    splits the input into many small cells.  (For spread > 0 some points may be dominated.)"""
+    rng = np.random.default_rng(seed)
+    out = []
+    while len(out) < n:
+        u = rng.uniform(-decades, decades, size=2)
+        w = -u.sum() + rng.uniform(-spread, spread)
+        if abs(w) <= decades:
+            out.append([u[0], u[1], w])
+    return 10.0 ** np.array(out)

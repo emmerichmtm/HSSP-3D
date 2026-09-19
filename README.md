@@ -1,6 +1,7 @@
-# hssp3d — 3-D hypervolume subset selection in n^O(√k) time
+# hssp3d — 3-D hypervolume subset selection: the n^O(√k) algorithm and the EPTAS
 
-Python/Numba implementation of the exact algorithm of Section 4 of
+Python/Numba implementation of the exact algorithm (Section 4) and of the efficient
+polynomial-time approximation scheme (Section 5, for d = 3) of
 
 > K. Bringmann, S. Cabello, M. T. M. Emmerich.
 > *Maximum Volume Subset Selection for Anchored Boxes.*
@@ -11,8 +12,8 @@ points that maximise the volume of the union of the boxes anchored at the origin
 (equivalently: the hypervolume indicator w.r.t. a reference point). The problem is NP-hard
 for *d* = 3; all earlier exact algorithms enumerate Ω(C(n,k)) subsets. The paper breaks this
 bound with a dynamic programme over planar separators of the *xy*-projection of the optimal
-solution, running in n^O(√k) time. This repository implements that dynamic programme (the
-EPTAS of Section 5 is not included).
+solution, running in n^O(√k) time, and gives an EPTAS based on an exponential grid and the
+shifting technique. This repository implements both.
 
 A short technical report is in [`report/report.pdf`](report/report.pdf).
 
@@ -94,6 +95,36 @@ bound of the implementation with the exact cost C(n,k)·k² of enumeration (defa
 With the proven constants no cross-over occurs for n ≤ 10⁹, k ≤ 3000. The advantage is real
 but purely asymptotic.
 
+## The EPTAS (Section 5, d = 3)
+
+```python
+from hssp3d import solve_eptas, log_simplex_points
+
+P = log_simplex_points(200, decades=40, seed=0)   # coordinates over 80 orders of magnitude
+r = solve_eptas(P, k=20, eps=0.25)                # C(200,20) ~ 1e27 subsets; runs in seconds
+print(r.hypervolume, r.stats["upper_bound"], r.stats["certified_ratio"])
+```
+
+`solve_eptas` follows the paper step by step: all τ³ grid offsets, deletion of the points in the
+thick grid boundaries, partition into cells, rounding down to powers of β = (1−ε)^(−1/3), exact
+solution of every cell for all budgets, and a dynamic programme that distributes k over the cells.
+With V the value of the best offset and S the returned set,
+
+    μ(S) ≥ (1−ε)·V,    V ≥ (1−ε)²·OPT,    hence    μ(S) ≥ (1−ε)³·OPT,
+
+so `V/(1−ε)²` is a **certified upper bound on the optimum**; it is returned in `stats` together
+with the certified ratio μ(S)/UB (it certifies any other solution, e.g. greedy's, as well).
+
+* Against brute force (n = 15, k = 5, DTLZ1/DTLZ2/log-simplex, 45 runs) the guarantee and the
+  upper bound hold everywhere; observed ratios are ≥ 0.927 (ε = 0.5), ≥ 0.979 (ε = 0.25) and
+  ≥ 0.994 (ε = 0.1).
+* On wide-range instances with n = 100…400, k = 10…20 (up to 10³³ subsets) it needs 0.1 s to a
+  few minutes — a measured advantage over enumeration. Greedy is faster still and 0.2–3.6 %
+  better on these (easy) instances; what the EPTAS adds is the certificate (≈ 0.65 for ε = 0.25).
+* The 2^O((ε⁻² log 1/ε)^d) term is the enumeration inside a cell. A cell spans 5.6 / 14 / 46
+  orders of magnitude per coordinate for ε = 0.5 / 0.25 / 0.1, so the scheme is practical for
+  small n or for inputs spanning many orders of magnitude; otherwise it raises `CellTooLarge`.
+
 ## Experiments
 
 ```bash
@@ -102,6 +133,7 @@ python experiments/run_comparison.py k6          # n = 15, k = 6: two recursion 
 python experiments/run_comparison.py deep        # forced deep recursion (base threshold 1)
 python experiments/run_comparison.py constants   # how small may the constants be?
 python experiments/crossover_model.py            # operation-count cross-over with brute force
+python experiments/run_eptas.py                  # EPTAS vs optimum (n = 15) and on n = 100..400
 ```
 
 Results (JSON) are written to `experiments/`; `python experiments/make_tables.py` turns them into the LaTeX tables of the report.

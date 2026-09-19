@@ -19,7 +19,7 @@
 \newtheorem{observation}{Observation}
 \makeatletter\newcommand{\tabinput}[1]{\@@input #1.tex }\makeatother
 
-\title{An Implementation of the $n^{O(\sqrt{k})}$ Algorithm for\\
+\title{An Implementation of the $n^{O(\sqrt{k})}$ Algorithm\\ and of the EPTAS for\\
 3-D Hypervolume Subset Selection\\[0.5ex]
 \large Technical report accompanying the \code{hssp3d} Python/Numba package}
 \author{Michael Emmerich\\[0.5ex]
@@ -42,7 +42,10 @@ and validates it against brute-force enumeration on random samples of the DTLZ1 
 Pareto fronts with $15$ points.  The dynamic programme reproduced the brute-force optimum
 on every instance.  As expected for an algorithm whose merit is asymptotic, it is orders of
 magnitude slower than enumeration for inputs of this size; the role of the constants hidden
-in the $O(\sqrt{k})$ is discussed and measured.
+in the $O(\sqrt{k})$ is discussed and measured, and an operation-count model locates the cross-over with
+enumeration.  The efficient polynomial-time approximation scheme (EPTAS) of the same paper is implemented as
+well: its guarantees are confirmed against the optimum, and on inputs spanning many orders of magnitude it
+handles hundreds of points in seconds and returns a certified upper bound on the optimum.
 \end{abstract}
 
 \section{Problem}
@@ -230,6 +233,7 @@ the small constants $c_b=1$, $c_\gamma=2.5$, $c_s=1$, for which the recursion is
 compare the result with brute force.
 
 \section{Experiments}
+\label{sec:exp}
 \paragraph{Setup.}
 Instances are $n=15$ points drawn uniformly at random from the Pareto fronts of three-objective DTLZ
 problems~\cite{DTLZ}: from the DTLZ2 front (the positive octant of the unit
@@ -405,13 +409,110 @@ where both methods need about $10^{360}$ operations.  With the proven constants 
 $n\le 10^9$ and $k\le 3000$.  The advantage of the algorithm is thus real but purely asymptotic: it lies
 entirely in a regime in which neither method can be executed.
 
+\section{The approximation scheme}
+\label{sec:eptas}
+The package also contains the EPTAS of \cite[Section~5]{BCE} for $d=3$ (\code{solve\_eptas} in
+\code{eptas.py}).
+
+\paragraph{Algorithm.}
+Let $\beta=(1-\varepsilon)^{-1/d}$, let $\tau$ be the smallest integer larger than $d/\varepsilon$ and
+$\lambda=\beta^{g}$ the smallest power of $\beta$ larger than $d/\varepsilon$.  The positive orthant is divided into
+\emph{regions} $\prod_i[\lambda^{x_i},\lambda^{x_i+1})$; for an offset $\bar\ell\in\{0,\dots,\tau-1\}^d$ the regions
+with $x_i\equiv\ell_i \pmod\tau$ for some $i$ form thick grid boundaries, and the remaining regions form grid cells of
+$(\tau-1)^d$ regions each.  For every offset the scheme (2) deletes the points in the boundaries, (3) partitions the
+remaining points into cells, (4) rounds all coordinates down to powers of $\beta$ and removes duplicates, (5) solves
+every cell exactly for all budgets $k'$, (6) distributes the budget, $V(\bar\ell)=\max_{\sum k_i\le k}\sum_i
+\mathrm{VolSel}(\tilde P_i,k_i)$, by dynamic programming, and (7) returns the best offset.  The shifting argument
+(Lemma~5.2) loses a factor $1-\varepsilon$, rounding (Lemma~5.3) another one, and treating cells as independent
+(Lemmas~5.4 and~5.5) a third one: with $V=\max_{\bar\ell}V(\bar\ell)$ and $S$ the returned set of original points,
+\begin{equation}\label{eq:eptas}
+  \mu(S)\ge(1-\varepsilon)\,V,\quad V\ge(1-\varepsilon)^2\,\mathrm{VolSel}(P,k),
+  \quad\text{hence}\quad \mu(S)\ge(1-\varepsilon)^3\,\mathrm{VolSel}(P,k).
+\end{equation}
+The second inequality makes $V/(1-\varepsilon)^2$ a \emph{certified upper bound} on the unknown optimum.  The
+implementation returns it together with $S$, so that the quality of $S$ (or of any other solution, e.g.\ the greedy
+one) can be certified a posteriori; in three dimensions $\mu(S)$ itself is computed exactly.
+
+\paragraph{Implementation.}
+Points are represented by their integer exponents $e_i=\lfloor\log_\beta p_i\rfloor$ (computed with a correction step
+against rounding of the logarithm), so that region indices $\lfloor e_i/g\rfloor$, cell indices and rounded points are
+exact integer quantities.  Step~(5) enumerates subsets with a Numba kernel; two exact simplifications are applied:
+rounded points dominated by another rounded point of the same cell are dropped, and the solution of a cell is cached,
+because the same group of points forms a cell for many offsets, as are offsets that induce the same partition.
+Step~(6) is the $O(nk)$ dynamic programme of the paper (the knapsack-based improvement of Section~5.4 is not
+implemented).  If fewer than $k$ points are selected, the set is completed greedily, which can only increase $\mu(S)$.
+The exponential term $2^{O(\varepsilon^{-2}\log 1/\varepsilon)^d}$ of the running time is the enumeration inside a
+cell: a cell spans $(\tau-1)g$ rounded values per coordinate, that is $48$, $312$ and $2910$ for
+$\varepsilon=0.5$, $0.25$ and $0.1$, or $5.6$, $14$ and $46$ orders of magnitude.  The implementation refuses
+(\code{CellTooLarge}) to enumerate more than $5\cdot10^7$ subsets in one cell.  The scheme is therefore practical
+either for small $n$, or for inputs whose coordinates span many orders of magnitude, so that cells are sparsely
+populated.
+
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3.2pt}
+\caption{EPTAS against the brute-force optimum: $n=15$, $k=5$, five instances per row.  ``guar.'': the guaranteed
+ratio $(1-\varepsilon)^3$; ``min''/``mean'': observed $\mu(S)/\mathrm{OPT}$; ``greedy'': smallest ratio of the greedy
+algorithm on the same instances; ``UB/OPT'': smallest ratio of the certified upper bound to the optimum (must be
+$\ge1$); ``cert.'': mean certified ratio $\mu(S)/\mathrm{UB}$; ``part.'': distinct partitions among the $\tau^3$
+offsets; ``cell'': largest number of rounded points in a cell.}
+\label{tab:eptas-small}
+\begin{tabular}{lrrrrrrrrrrr}
+\toprule
+instances & $\varepsilon$ & guar. & min & mean & greedy & UB/OPT & cert. & $\tau^3$ & part. & cell & $t$ [s]\\
+\midrule
+\tabinput{table_eptas_small}
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering\footnotesize
+\setlength{\tabcolsep}{3.2pt}
+\caption{EPTAS on log-simplex instances far beyond enumeration (three instances per row).  $\binom{n}{k}$: subsets
+brute force would have to enumerate; ``cells'': largest number of non-empty cells over the offsets (mean over the instances);
+``cell'': largest number of rounded points in a cell; ``vs.\ greedy'': mean $\mu(S_{\mathrm{EPTAS}})/\mu(S_{\mathrm{greedy}})$;
+``cert.'': mean certified ratio $\mu(S)/\mathrm{UB}$.}
+\label{tab:eptas-large}
+\begin{tabular}{rrrrrrrrrrrr}
+\toprule
+$n$ & $k$ & $\binom{n}{k}$ & $\varepsilon$ & solved & cells & cell & vs.\ greedy & guar. & cert. & $t$ [s] & $t_{\mathrm{greedy}}$ [ms]\\
+\midrule
+\tabinput{table_eptas_large}
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Experiments.}
+Table~\ref{tab:eptas-small} compares the scheme with the brute-force optimum on DTLZ instances as in
+Section~\ref{sec:exp} and on \emph{log-simplex} instances: points $10^{u}$ with $u$ uniform on the plane $u_1+u_2+u_3=c$,
+$|u_i|\le 10$, $c\in[-1,1]$, so that the coordinates span $20$ orders of magnitude and the boxes have comparable
+volumes.  The guarantee~\eqref{eq:eptas} and the validity of the upper bound hold on all $45$ runs, as they must;
+the unit tests check them, including $\mu(S)\ge(1-\varepsilon)V$, on further instances.  The observed ratios
+($\ge 0.927$ for $\varepsilon=0.5$, $\ge 0.994$ for $\varepsilon=0.1$) are far better than the worst-case
+guarantee, and for $\varepsilon\le0.25$ the scheme is more reliable than greedy on the DTLZ instances.  For the DTLZ
+fronts the surviving points share one cell (at most two for $\varepsilon=0.5$), so the scheme essentially amounts to
+deleting boundary points, rounding and enumeration.
+
+Table~\ref{tab:eptas-large} uses log-simplex instances over $80$ orders of magnitude with up to $400$ points and
+$k=20$.  Here the input splits into roughly $50$ to $190$ cells with at most $23$ rounded points, and the scheme needs between
+$0.1$ seconds and a few minutes, whereas brute force would have to enumerate up to $10^{33}$ subsets: this is a
+\emph{measured} advantage over enumeration, in contrast to the exact algorithm (Section~\ref{sec:crossover}).  Two
+caveats are in order.  First, the greedy algorithm is faster still and its solutions are slightly better on these
+instances (by $0.2$--$3.6\,\%$ on average); widely spread boxes overlap little, which makes the instances easy.  Second, the
+a-priori guarantee $(1-\varepsilon)^3$ is weak for the values of $\varepsilon$ for which cells remain enumerable.  What
+the scheme adds in practice is the certificate: for $\varepsilon=0.25$ it proves that the returned set, and hence also the better
+greedy set, is within a factor $0.64$--$0.65$ of the optimum, slightly more than the $1-1/e\approx0.632$ known for greedy
+a priori, and for $\varepsilon=0.1$ it certifies about $0.85$ on the instances of Table~\ref{tab:eptas-small}.
+
 \section{Conclusion}
 The $n^{O(\sqrt{k})}$ algorithm for 3-D hypervolume subset selection has been implemented in full and
 agrees with brute-force enumeration on all tested instances of the DTLZ1 and DTLZ2 fronts, also when only
 cycle separators are used and when the recursion is forced to be deep.  In terms of operation counts it overtakes enumeration only for instances such as $n=10^6$,
-$k\ge 80$ (Section~\ref{sec:crossover}), far outside the range in which either method can be run.  The EPTAS of \cite[Section~5]{BCE}
-is not part of this implementation.  Source code, tests and the scripts that generate all tables of this report
-are contained in the repository.
+$k\ge 80$ (Section~\ref{sec:crossover}), far outside the range in which either method can be run.  The EPTAS of
+\cite[Section~5]{BCE} has been implemented for $d=3$ as well; its guarantees were confirmed against the optimum, it
+handles wide-range instances with hundreds of points in seconds, and it returns a certified upper bound on the
+optimum.  Source code, tests and the scripts that generate all tables of this report are contained in the repository.
 
 \begin{thebibliography}{9}
 \bibitem{BCE} K.~Bringmann, S.~Cabello, M.~T.~M.~Emmerich.

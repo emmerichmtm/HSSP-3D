@@ -75,6 +75,47 @@ def constants_table(rows):
     return lines
 
 
+def eptas_small_table(rows):
+    lines = []
+    rows = [r for r in rows if r["exp"] == "small"]
+    for family in ["DTLZ1", "DTLZ2", "logsimplex-10"]:
+        for eps in sorted({r["eps"] for r in rows}, reverse=True):
+            rs = [r for r in rows if r["family"] == family and r["eps"] == eps]
+            ratio = [r["hv"] / r["hv_opt"] for r in rs]
+            lines.append(" & ".join([
+                family.replace("logsimplex-10", "log-simplex"), f"{eps:g}", f"{rs[0]['guaranteed_ratio']:.3f}",
+                f"{min(ratio):.4f}", f"{np.mean(ratio):.4f}",
+                f"{min(r['hv_greedy'] / r['hv_opt'] for r in rs):.4f}",
+                f"{min(r['upper_bound'] / r['hv_opt'] for r in rs):.3f}",
+                f"{np.mean([r['certified_ratio'] for r in rs]):.3f}",
+                num(rs[0]["offsets"]), num(np.mean([r["distinct_partitions"] for r in rs])),
+                str(max(r["max_cell_points"] for r in rs)),
+                f"{np.mean([r['time'] for r in rs]):.2f}"]) + " \\\\")
+    return lines
+
+
+def eptas_large_table(rows):
+    lines = []
+    rows = [r for r in rows if r["exp"] == "large"]
+    for n, k, eps in sorted({(r["n"], r["k"], -r["eps"]) for r in rows}):
+        eps = -eps
+        rs = [r for r in rows if (r["n"], r["k"], r["eps"]) == (n, k, eps)]
+        ok = [r for r in rs if not r["failed"]]
+        cells = [str(n), str(k), f"$10^{{{np.mean([r['log10_subsets'] for r in rs]):.0f}}}$", f"{eps:g}",
+                 f"{len(ok)}/{len(rs)}"]
+        if ok:
+            cells += [num(np.mean([r["max_cells"] for r in ok])), str(max(r["max_cell_points"] for r in ok)),
+                      f"{np.mean([r['hv'] / r['hv_greedy'] for r in ok]):.4f}",
+                      f"{rs[0]['guaranteed_ratio']:.3f}" if "guaranteed_ratio" in rs[0] else "",
+                      f"{np.mean([r['certified_ratio'] for r in ok]):.3f}",
+                      f"{np.mean([r['time'] for r in ok]):.1f}",
+                      f"{1000 * np.mean([r['t_greedy'] for r in ok]):.0f}"]
+        else:
+            cells += ["--"] * 7
+        lines.append(" & ".join(cells) + " \\\\")
+    return lines
+
+
 if __name__ == "__main__":
     main = load("main") + load("k6")
     write("values", values_table(main))
@@ -93,5 +134,9 @@ if __name__ == "__main__":
                f"instances.")
     with open(os.path.join(ROOT, "report", "summary_main.tex"), "w") as f:
         f.write(summary + "\n")
+    eptas = load("eptas")
+    if eptas:
+        write("eptas_small", eptas_small_table(eptas))
+        write("eptas_large", eptas_large_table(eptas))
     allrows = main + load("deep")
     print("instances:", len(allrows), "all match:", all(r["match"] for r in allrows))
