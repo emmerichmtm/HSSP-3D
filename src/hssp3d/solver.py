@@ -50,6 +50,7 @@ class SeparatorParams:
                 induced by a cycle that really cuts D are used.
     prune     : branch-and-bound on the choice of S_0 (greedy incumbent +
                 submodular upper bound).  Never changes the optimum that is found.
+    cycle_cap, s0_cap : optional absolute limits on |gamma| and |S_0| (0 = none).
     theory    : use the constants for which exactness is proven (Miller's
                 cycle separator: |gamma| <= 4 sqrt(|V(T)|), |V(T)| <= 5(|S|+l)+5,
                 |P_gamma| <= 2|gamma|).  For every k of practical size these are
@@ -61,6 +62,8 @@ class SeparatorParams:
     allow_trivial: bool = True
     theory: bool = False
     prune: bool = True
+    cycle_cap: int = 0          # > 0: absolute upper limit on |gamma|
+    s0_cap: int = 0             # > 0: absolute upper limit on |S_0|
 
     def base(self, k):
         return max(1, math.ceil(self.c_base * math.sqrt(k)))
@@ -68,12 +71,14 @@ class SeparatorParams:
     def cycle_len(self, m):
         if self.theory:
             return int(4.0 * math.sqrt(5 * m + 5))
-        return max(3, math.ceil(self.c_cycle * math.sqrt(m)))
+        L = max(3, math.ceil(self.c_cycle * math.sqrt(m)))
+        return min(L, self.cycle_cap) if self.cycle_cap > 0 else L
 
     def s0_max(self, m):
         if self.theory:
             return 2 * self.cycle_len(m)
-        return max(1, math.ceil(self.c_s0 * math.sqrt(m)))
+        s = max(1, math.ceil(self.c_s0 * math.sqrt(m)))
+        return min(s, self.s0_cap) if self.s0_cap > 0 else s
 
 
 @dataclass

@@ -339,10 +339,77 @@ of~\cite{BCE} executable, confirms on concrete data that the compliance-based re
 correct, and provides tested building blocks (the triangulation $T(Q)$, compliant domains, cycle-induced
 partitions) for future work on practical separator-based or approximate variants.
 
+\section{Is there an instance on which the algorithm wins?}
+\label{sec:crossover}
+\paragraph{Not one that can be run.}
+In all measurements the dynamic programme is slower than enumeration by three to five orders of magnitude,
+and the ratio deteriorates with $k$ (Table~\ref{tab:effort}).  We also tried the most favourable setting we could
+think of: ``chain'' instances ($x$ increasing, $y$ decreasing, $z$ increasing along the points), whose
+projection graph consists of stacked strips with a balanced separator through two points at every level, solved
+with the smallest constants that work ($|S_0|\le 2$, $|\gamma|\le 6$, no trivial partitions).  For $n=16$, $k=6$
+the run was stopped unfinished after ten minutes, while brute force enumerates the $8008$ subsets in
+milliseconds.  An honest example of an advantage can therefore only be given in terms of operation counts.
+
+\paragraph{Operation-count model.}
+The script \code{experiments/crossover\_model.py} evaluates a worst-case upper bound on the number of elementary
+operations of the implementation and compares it with the exact cost $\binom{n}{k}k^2$ of enumeration.  Along
+the worst-case chain of the recursion ($\ell_{i+1}=\lfloor 2\ell_i/3\rfloor$, $|S_{i+1}|=|S_i|+s_i$ with
+$s_i$ the bound on $|S_0|$ and $L_i$ the bound on $|\gamma|$ at level $i$, $V_i=5(|S_i|+s_i)+5$ vertices and $F_i=2V_i-6$
+triangles) it uses
+\begin{align*}
+ \#\text{tuples}_{i+1} &\le \min\Bigl\{\#\text{tuples}_i\cdot\tbinom{n}{\le s_i}\,V_i^{L_i}\,F_i\,k,\ \
+                          \tbinom{n}{|S_{i+1}|}\,2^{F}\,k\Bigr\},\\
+ \text{work per recursive tuple} &\le \tbinom{n}{\le s_i}\,V_i^{L_i}\,F_i\,k^2,\qquad
+ \text{work per base tuple} \le \tbinom{n}{\le \ell_i}\,(|S_i|+\ell_i)^2 ,
+\end{align*}
+i.e.\ the choices of $S_0$, of the cycle, of a component and of a budget.  The bound is loose (for $n=15$,
+$k=5$ it gives $10^{17}$ operations where of the order of $10^{10}$ are executed), so the true cross-over may
+occur somewhat earlier than predicted; the brute-force count is exact.
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{Smallest $k$ for which the operation bound of the dynamic programme drops below the cost of brute
+force ($k\le\min(n/2,3000)$ examined; ``--'': never).  ``default'': $c_b=1$, $c_\gamma=2.5$, $c_s=1$;
+``proven'': the constants of Miller's theorem.}
+\label{tab:crossover}
+\begin{tabular}{r|rrr|rrr}
+\toprule
+ & \multicolumn{3}{c|}{default constants} & \multicolumn{3}{c}{proven constants}\\
+$n$ & $k$ & DP $\le$ & BF & $k$ & DP $\le$ & BF\\
+\midrule
+\tabinput{table_crossover}
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{Operation counts for instances far beyond the cross-over (default constants).}
+\label{tab:advantage}
+\begin{tabular}{rrrrlr}
+\toprule
+$n$ & $k$ & separator DP $\le$ & brute force & fewer operations & factor\\
+\midrule
+\tabinput{table_advantage}
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Result.}
+Table~\ref{tab:crossover} shows that for $n\le 1000$ the bound never drops below the cost of enumeration: since
+$\binom{n}{k}\le 2^n$, brute force is simply not expensive enough when $n$ is small, whatever $k$.  The
+$\sqrt{k}$ in the exponent pays off only when $n\gg k\gg 1$.  An example where the algorithm has an advantage is
+$n=10^6$, $k=200$ (Table~\ref{tab:advantage}): at most $10^{656}$ operations against $10^{830}$, a factor of
+$10^{174}$, growing to $10^{2005}$ for $k=1000$.  The first such instances appear around $n=10^6$, $k\approx 80$,
+where both methods need about $10^{360}$ operations.  With the proven constants no cross-over occurs for
+$n\le 10^9$ and $k\le 3000$.  The advantage of the algorithm is thus real but purely asymptotic: it lies
+entirely in a regime in which neither method can be executed.
+
 \section{Conclusion}
 The $n^{O(\sqrt{k})}$ algorithm for 3-D hypervolume subset selection has been implemented in full and
 agrees with brute-force enumeration on all tested instances of the DTLZ1 and DTLZ2 fronts, also when only
-cycle separators are used and when the recursion is forced to be deep.  The EPTAS of \cite[Section~5]{BCE}
+cycle separators are used and when the recursion is forced to be deep.  In terms of operation counts it overtakes enumeration only for instances such as $n=10^6$,
+$k\ge 80$ (Section~\ref{sec:crossover}), far outside the range in which either method can be run.  The EPTAS of \cite[Section~5]{BCE}
 is not part of this implementation.  Source code, tests and the scripts that generate all tables of this report
 are contained in the repository.
 

@@ -74,6 +74,26 @@ a cycle that really cuts the domain (used to test the separator machinery in iso
 seconds to minutes. The purpose of the code is to make the construction of the paper concrete
 and testable, not to be a practical HSSP solver.
 
+### Is there an instance where it beats brute force?
+
+Not one that can be run. Even on a favourable structured family ("chain" instances with a
+two-point balanced separator at every level) and with the smallest constants that work, n = 16,
+k = 6 was stopped unfinished after ten minutes, while brute force needs milliseconds. Because
+C(n,k) ≤ 2ⁿ, enumeration is simply not expensive enough for small n; the √k in the exponent
+pays off only for n ≫ k ≫ 1. `experiments/crossover_model.py` compares a worst-case operation
+bound of the implementation with the exact cost C(n,k)·k² of enumeration (default constants):
+
+| n    | k    | separator DP ≤ | brute force | fewer operations |
+|------|------|----------------|-------------|------------------|
+| ≤10³ | any  |                |             | brute force      |
+| 10⁶  | 50   | 10³¹⁵          | 10²³⁹       | brute force      |
+| 10⁶  | 79   | 10³⁶⁰          | 10³⁶¹       | DP (cross-over)  |
+| 10⁶  | 200  | 10⁶⁵⁶          | 10⁸³⁰       | DP, factor 10¹⁷⁴ |
+| 10⁶  | 1000 | 10¹⁴³³         | 10³⁴³⁸      | DP, factor 10²⁰⁰⁵|
+
+With the proven constants no cross-over occurs for n ≤ 10⁹, k ≤ 3000. The advantage is real
+but purely asymptotic.
+
 ## Experiments
 
 ```bash
@@ -81,6 +101,7 @@ python experiments/run_comparison.py main        # n = 15, DTLZ1/DTLZ2, k = 3,4,
 python experiments/run_comparison.py k6          # n = 15, k = 6: two recursion levels; not finished after 90 min on a laptop
 python experiments/run_comparison.py deep        # forced deep recursion (base threshold 1)
 python experiments/run_comparison.py constants   # how small may the constants be?
+python experiments/crossover_model.py            # operation-count cross-over with brute force
 ```
 
 Results (JSON) are written to `experiments/`; `python experiments/make_tables.py` turns them into the LaTeX tables of the report.
