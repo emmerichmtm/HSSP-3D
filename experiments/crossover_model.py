@@ -31,13 +31,23 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from hssp3d import SeparatorParams  # noqa: E402
 
 LOG10 = math.log(10.0)
-KMAX = 3000          # largest k examined
+KMAX_LINEAR = 3000       # default constants: every k up to here is examined
+KMAX_PROVEN = 600_000    # proven constants: geometric scan up to here
 
 
 def lbinom(n, k):
+    """log10 C(n, k).
+
+    For large n the difference lgamma(n+1) - lgamma(n-k+1) of two numbers of size n ln n
+    cancels catastrophically (at n = 1e18 the absolute error is in the thousands), so for
+    n >= 1e13 the expansion  ln C(n,k) = k ln n - ln k! - k(k-1)/(2n) + O(k^3/n^2)  is used;
+    for k <= 1e6 its truncation error is below 1e-7."""
     if k < 0 or k > n:
         return -math.inf
-    return (math.lgamma(n + 1) - math.lgamma(k + 1) - math.lgamma(n - k + 1)) / LOG10
+    k = min(k, n - k)
+    if n < 1e13:
+        return (math.lgamma(n + 1) - math.lgamma(k + 1) - math.lgamma(n - k + 1)) / LOG10
+    return (k * math.log(n) - math.lgamma(k + 1) - k * (k - 1) / (2.0 * n)) / LOG10
 
 
 def ladd(a, b):
@@ -78,28 +88,60 @@ def log_separator_dp(n, k, par):
     return total
 
 
+def wins(n, k, par):
+    return log_separator_dp(n, k, par) < log_brute_force(n, k)
+
+
 def crossover(n, par):
-    for k in range(2, min(n // 2, KMAX) + 1):
-        if log_separator_dp(n, k, par) < log_brute_force(n, k):
-            return k
+    """Smallest k <= n/2 at which the DP bound drops below brute force, or None.
+
+    The model is not monotone in k (the ceilings in the separator bounds make it jump), so
+    for the default constants every k is tried.  For the proven constants the crossing lies
+    at k in the tens of thousands, where that is too slow; a geometric scan in steps of 4 %
+    followed by bisection is used, which places the crossing to within about 4 %."""
+    if not par.theory:
+        for k in range(2, min(n // 2, KMAX_LINEAR) + 1):
+            if wins(n, k, par):
+                return k
+        return None
+    prev, k = 1, 2
+    while k <= min(n // 2, KMAX_PROVEN):
+        if wins(n, k, par):
+            lo, hi = prev, k
+            while hi - lo > 1:
+                mid = (lo + hi) // 2
+                lo, hi = (lo, mid) if wins(n, mid, par) else (mid, hi)
+            return hi
+        prev, k = k, max(k + 1, int(k * 1.04))
     return None
+
+
+def implied_c(n, k, dp):
+    """c such that the DP bound equals n^(c sqrt k) at the crossing."""
+    return dp / (math.sqrt(k) * math.log10(n))
+
+
+def power(x):
+    return f"$10^{{{x:,.0f}}}$".replace(",", r"\,")
 
 
 if __name__ == "__main__":
     modes = [("default", SeparatorParams()), ("proven", SeparatorParams(theory=True))]
     lines = []
-    for n in [15, 100, 10 ** 3, 10 ** 4, 10 ** 6, 10 ** 9]:
+    for n in [15, 100, 10 ** 3, 10 ** 4, 10 ** 6, 10 ** 7, 10 ** 9, 10 ** 12, 10 ** 18, 10 ** 30]:
         row = [f"$10^{{{round(math.log10(n))}}}$" if n >= 100 else str(n)]
         for name, par in modes:
             k = crossover(n, par)
             if k is None:
-                row += ["--", "--", "--"]
-                print(f"n={n:>10} {name:8s}: brute force is never beaten for k <= min(n/2, KMAX)")
+                row += ["--"] * 4
+                print(f"n={n:>8.0e} {name:8s}: no crossover for k <= n/2")
             else:
                 dp, bf = log_separator_dp(n, k, par), log_brute_force(n, k)
-                row += [str(k), f"$10^{{{dp:.0f}}}$", f"$10^{{{bf:.0f}}}$"]
-                print(f"n={n:>10} {name:8s}: first k with DP bound < brute force: k={k:>4}  "
-                      f"DP <= 1e{dp:.0f} ops, BF = 1e{bf:.0f} ops")
+                c = implied_c(n, k, dp)
+                row += [f"{k:,}".replace(",", r"\,"), power(dp), power(bf), f"{c:.1f}"]
+                print(f"n={n:>8.0e} {name:8s}: k={k:>7,}  DP <= 1e{dp:,.0f}  BF = 1e{bf:,.0f}"
+                      f"  c = {c:.1f}")
+            sys.stdout.flush()
         lines.append(" & ".join(row) + " \\\\")
     with open(os.path.join(os.path.dirname(__file__), "..", "report", "table_crossover.tex"), "w") as f:
         f.write("\n".join(lines) + "\n")

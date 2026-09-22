@@ -92,8 +92,19 @@ bound of the implementation with the exact cost C(n,k)·k² of enumeration (defa
 | 10⁶  | 200  | 10⁶⁵⁶          | 10⁸³⁰       | DP, factor 10¹⁷⁴ |
 | 10⁶  | 1000 | 10¹⁴³³         | 10³⁴³⁸      | DP, factor 10²⁰⁰⁵|
 
-With the proven constants no cross-over occurs for n ≤ 10⁹, k ≤ 3000. The advantage is real
-but purely asymptotic.
+With the constants for which exactness is proven, the same model gives:
+
+| n    | cross-over at k | both sides ≈ | implied c in n^(c√k) |
+|------|-----------------|--------------|----------------------|
+| ≤10⁶ | none, for any k ≤ n/2 |        |                      |
+| 10⁷  | ≈ 115 000       | 10²⁷²⁸⁷⁰     | 115                  |
+| 10⁹  | ≈ 53 600        | 10²⁵²²⁷⁰     | 121                  |
+| 10¹² | ≈ 34 900        | 10²⁷⁵⁶⁵⁰     | 123                  |
+| 10³⁰ | ≈ 20 700        | 10⁵³⁹³⁹⁰     | 125                  |
+
+against c ≈ 5–8 with the default constants. The two caveats pull in opposite directions: the bound
+on the separator DP is loose, so the true cross-over lies at or below the tabulated k, while proven
+exactness needs the larger separator, which moves it up. The advantage is real but purely asymptotic.
 
 ## The EPTAS (Section 5, d = 3)
 

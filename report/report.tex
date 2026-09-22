@@ -382,14 +382,16 @@ occur somewhat earlier than predicted; the brute-force count is exact.
 
 \begin{table}[t]
 \centering\footnotesize
-\caption{Smallest $k$ for which the operation bound of the dynamic programme drops below the cost of brute
-force ($k\le\min(n/2,3000)$ examined; ``--'': never).  ``default'': $c_b=1$, $c_\gamma=2.5$, $c_s=1$;
-``proven'': the constants of Miller's theorem.}
+\caption{Smallest $k\le n/2$ for which the operation bound of the dynamic programme drops below the cost of
+brute force (``--'': never).  ``default'': $c_b=1$, $c_\gamma=2.5$, $c_s=1$, every $k$ examined; ``proven'':
+the constants of Miller's theorem, located by a geometric scan in steps of $4\,\%$ and bisection, hence to
+within about $4\,\%$.  $c$ is the exponent constant implied at the crossing, $\mathrm{DP}=n^{c\sqrt{k}}$.}
 \label{tab:crossover}
-\begin{tabular}{r|rrr|rrr}
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{r|rrrr|rrrr}
 \toprule
- & \multicolumn{3}{c|}{default constants} & \multicolumn{3}{c}{proven constants}\\
-$n$ & $k$ & DP $\le$ & BF & $k$ & DP $\le$ & BF\\
+ & \multicolumn{4}{c|}{default constants} & \multicolumn{4}{c}{proven constants}\\
+$n$ & $k$ & DP $\le$ & BF & $c$ & $k$ & DP $\le$ & BF & $c$\\
 \midrule
 \tabinput{table_crossover}
 \bottomrule
@@ -415,9 +417,15 @@ $\binom{n}{k}\le 2^n$, brute force is simply not expensive enough when $n$ is sm
 $\sqrt{k}$ in the exponent pays off only when $n\gg k\gg 1$.  An example where the algorithm has an advantage is
 $n=10^6$, $k=200$ (Table~\ref{tab:advantage}): at most $10^{656}$ operations against $10^{830}$, a factor of
 $10^{174}$, growing to $10^{2005}$ for $k=1000$.  The first such instances appear around $n=10^6$, $k\approx 80$,
-where both methods need about $10^{360}$ operations.  With the proven constants no cross-over occurs for
-$n\le 10^9$ and $k\le 3000$.  The advantage of the algorithm is thus real but purely asymptotic: it lies
-entirely in a regime in which neither method can be executed.
+where both methods need about $10^{360}$ operations; at the crossing the bound corresponds to
+$n^{c\sqrt{k}}$ with $c\approx 5$--$8$.  With the constants for which exactness is proven, the model shows no
+cross-over at all for $n\le 10^6$, for any $k\le n/2$.  One first appears between $n=10^6$ and $10^7$, at
+$k\approx 1.2\cdot 10^5$, and it moves down only slowly with $n$: to $k\approx 5.4\cdot10^4$ at $n=10^9$ and
+$k\approx 2.1\cdot 10^4$ at $n=10^{30}$, where both sides exceed $10^{250\,000}$ operations.  The implied constant
+rises to $c\approx 115$--$125$.  Two caveats pull in opposite directions: the bound on the dynamic programme is
+loose, so the true cross-over of the implementation lies at or below the tabulated $k$, whereas proven
+exactness requires the larger separator, which moves it up.  The advantage of the algorithm is thus real but
+purely asymptotic: it lies entirely in a regime in which neither method can be executed.
 
 \section{The approximation scheme}
 \label{sec:eptas}
